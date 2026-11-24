@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數列攻防戰 - 桌遊計時器</title>
+    <!-- 引入圓潤可愛的繁體中文字體 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Zen+Maru+Gothic:wght@700;900&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定義桌遊手繪風格樣式與動畫 */
+        :root {
+            --ink-dark: #3B2820;
+            --cream-bg: #FDF4DC;
+            --ribbon-gold: #F9D478;
+            --knight-red: #E05A5A;
+            --knight-blue: #4A90E2;
+            --knight-yellow: #F5B841;
+            --knight-green: #5BAE68;
+        }
+
+        body {
+            font-family: 'Zen Maru Gothic', 'Noto Sans TC', sans-serif;
+            color: var(--ink-dark);
+            background: linear-gradient(180deg, #9AD0F5 0%, #D9EEFC 45%, #CBE5B8 80%, #99C786 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        /* 桌遊標題雙層描邊效果 (白邊 + 深咖啡粗框 + 陰影) */
+        .game-title-char {
+            display: inline-block;
+            font-weight: 900;
+            -webkit-text-stroke: 6px #FFFFFF;
+            paint-order: stroke fill;
+            filter: drop-shadow(0px 3px 0px var(--ink-dark)) 
+                    drop-shadow(0px -2px 0px var(--ink-dark)) 
+                    drop-shadow(2px 0px 0px var(--ink-dark)) 
+                    drop-shadow(-2px 0px 0px var(--ink-dark))
+                    drop-shadow(0px 5px 4px rgba(59, 40, 32, 0.35));
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .game-title-char:hover {
+            transform: translateY(-4px) scale(1.08);
+        }
+
+        /* 粗描邊與立體按鈕質感 */
+        .board-border {
+            border: 3.5px solid var(--ink-dark);
+            box-shadow: 0 5px 0 var(--ink-dark);
+        }
+
+        .board-border-sm {
+            border: 2.5px solid var(--ink-dark);
+            box-shadow: 0 3px 0 var(--ink-dark);
+        }
+
+        .board-btn {
+            border: 3px solid var(--ink-dark);
+            box-shadow: 0 4px 0 var(--ink-dark);
+            transition: all 0.1s ease;
+            cursor: pointer;
+        }
+
+        .board-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 var(--ink-dark);
+        }
+
+        .board-btn:active:not(:disabled) {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 var(--ink-dark);
+        }
+
+        .board-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        /* 羊皮紙緞帶橫幅 */
+        .ribbon-banner {
+            background: linear-gradient(180deg, #FDE293 0%, #F6C558 100%);
+            border: 3px solid var(--ink-dark);
+            box-shadow: 0 4px 0 var(--ink-dark);
+            position: relative;
+        }
+
+        /* 漂浮撲克牌與星星動畫 */
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(var(--rot, -8deg)); }
+            50% { transform: translateY(-10px) rotate(calc(var(--rot, -8deg) + 4deg)); }
+        }
+
+        @keyframes sparklePulse {
+            0%, 100% { transform: scale(0.85) rotate(0deg); opacity: 0.75; }
+            50% { transform: scale(1.15) rotate(12deg); opacity: 1; }
+        }
+
+        @keyframes knightBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-8px) scale(1.04); }
+        }
+
+        @keyframes shakeAlarm {
+            0%, 100% { transform: rotate(0deg); }
+            20% { transform: rotate(-4deg) scale(1.03); }
+            40% { transform: rotate(4deg) scale(1.03); }
+            60% { transform: rotate(-3deg); }
+            80% { transform: rotate(3deg); }
+        }
+
+        .animate-float-card {
+            animation: floatSlow 4s ease-in-out infinite;
+        }
+
+        .animate-sparkle {
+            animation: sparklePulse 2.8s ease-in-out infinite;
+        }
+
+        .knight-active {
+            animation: knightBounce 1.2s ease-in-out infinite;
+            box-shadow: 0 0 0 4px #FFF, 0 0 0 7px var(--ink-dark), 0 10px 20px rgba(59, 40, 32, 0.35) !important;
+        }
+
+        .alarm-shake {
+            animation: shakeAlarm 0.45s ease-in-out infinite;
+        }
+
+        /* 數字等寬對齊 */
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FDF4DC;
+            border-radius: 99px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D2B48C;
+            border: 2px solid #3B2820;
+            border-radius: 99px;
+        }
+    </style>
+</head>
+<body class="relative flex flex-col items-center justify-between py-4 px-3 sm:px-6">
+
+    <!-- 背景插畫層：水彩城堡輪廓、雲朵、閃亮星星與漂浮卡牌 -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+        <!-- 柔和雲朵 -->
+        <svg class="absolute top-6 left-4 w-36 sm:w-52 opacity-75" viewBox="0 0 200 80" fill="none">
+            <path d="M35 65H165C180 65 190 54 190 41C190 29 180 19 168 18C163 7 151 0 137 0C125 0 114 6 108 15C103 12 97 10 90 10C75 10 62 21 60 35C45 36 33 48 33 63C33 64 34 65 35 65Z" fill="#FFFFFF"/>
+        </svg>
+        <svg class="absolute top-12 right-6 w-40 sm:w-60 opacity-70" viewBox="0 0 200 80" fill="none">
+            <path d="M25 68H175C188 68 196 58 196 46C196 35 187 26 176 25C171 12 158 4 143 4C129 4 117 11 111 22C105 18 98 16 90 16C73 16 59 29 57 45C42 46 30 56 25 68Z" fill="#FFFFFF"/>
+        </svg>
+
+        <!-- 遠景童話城堡剪影 -->
+        <svg class="absolute bottom-14 left-1/2 -translate-x-1/2 w-[680px] max-w-[140vw] opacity-35" viewBox="0 0 600 260" fill="none">
+            <!-- 城堡主體 -->
+            <rect x="230" y="110" width="140" height="140" fill="#B5C7E8"/>
+            <rect x="165" y="140" width="65" height="110" fill="#C7D5F0"/>
+            <rect x="370" y="140" width="65" height="110" fill="#C7D5F0"/>
+            <!-- 尖塔屋頂 -->
+            <polygon points="300,25 260,110 340,110" fill="#E88B84"/>
+            <polygon points="197,70 160,140 235,140" fill="#7DA8E6"/>
+            <polygon points="402,70 365,140 440,140" fill="#7DA8E6"/>
+            <polygon points="120,105 90,165 150,165" fill="#F2C46D"/>
+            <polygon points="480,105 450,165 510,165" fill="#F2C46D"/>
+            <rect x="95" y="165" width="50" height="85" fill="#D4DFF5"/>
+            <rect x="455" y="165" width="50" height="85" fill="#D4DFF5"/>
+            <!-- 城門 -->
+            <path d="M275 250V200C275 186 286 175 300 175C314 175 325 186 325 200V250H275Z" fill="#7C8EB5"/>
+        </svg>
+
+        <!-- 閃亮四角星星 -->
+        <svg class="absolute top-14 left-[12%] w-8 h-8 animate-sparkle" style="animation-delay: 0.2s" viewBox="0 0 40 40">
+            <path d="M20 2 L24 15 L38 20 L24 25 L20 38 L16 25 L2 20 L16 15 Z" fill="#F7C948" stroke="#E09F1F" stroke-width="1.5"/>
+        </svg>
+        <svg class="absolute top-28 right-[14%] w-10 h-10 animate-sparkle" style="animation-delay: 0.9s" viewBox="0 0 40 40">
+            <path d="M20 2 L24 15 L38 20 L24 25 L20 38 L16 25 L2 20 L16 15 Z" fill="#F7C948" stroke="#E09F1F" stroke-width="1.5"/>
+        </svg>
+        <svg class="absolute bottom-36 left-[8%] w-7 h-7 animate-sparkle" style="animation-delay: 1.4s" viewBox="0 0 40 40">
+            <path d="M20 2 L24 15 L38 20 L24 25 L20 38 L16 25 L2 20 L16 15 Z" fill="#F7C948"/>
+        </svg>
+        <svg class="absolute top-1/2 right-[7%] w-6 h-6 animate-sparkle" style="animation-delay: 0.5s" viewBox="0 0 40 40">
+            <path d="M20 2 L24 15 L38 20 L24 25 L20 38 L16 25 L2 20 L16 15 Z" fill="#F7C948"/>
+        </svg>
+
+        <!-- 漂浮撲克牌裝飾（大螢幕顯示） -->
+        <div class="hidden lg:block absolute top-28 left-10 animate-float-card" style="--rot: -14deg;">
+            <div class="w-16 h-22 bg-white rounded-xl border-[3px] border-[#3B2820] shadow-md flex flex-col items-center justify-center p-1.5">
+                <span class="text-xs font-black self-start leading-none">A</span>
+                <span class="text-2xl leading-none my-0.5">♠️</span>
+                <span class="text-xs font-black self-end leading-none rotate-180">A</span>
+            </div>
+        </div>
+        <div class="hidden lg:block absolute top-36 right-12 animate-float-card" style="--rot: 12deg; animation-delay: 1.2s;">
+            <div class="w-16 h-22 bg-white rounded-xl border-[3px] border-[#3B2820] shadow-md flex flex-col items-center justify-center p-1.5 text-[#3B2820]">
+                <span class="text-xs font-black self-start leading-none text-[#4A90E2]">7</span>
+                <span class="text-2xl font-black text-[#4A90E2] leading-none my-0.5">7</span>
+                <span class="text-xs font-black self-end leading-none text-[#4A90E2] rotate-180">7</span>
+            </div>
+        </div>
+        <div class="hidden lg:block absolute bottom-28 left-14 animate-float-card" style="--rot: -10deg; animation-delay: 0.7s;">
+            <div class="w-14 h-20 bg-white rounded-xl border-[3px] border-[#3B2820] shadow-md flex flex-col items-center justify-center p-1 text-[#E05A5A]">
+                <span class="text-xs font-black self-start leading-none">8</span>
+                <span class="text-xl leading-none">♥️</span>
+            </div>
+        </div>
+        <div class="hidden lg:block absolute bottom-32 right-14 animate-float-card" style="--rot: 15deg; animation-delay: 1.8s;">
+            <div class="w-14 h-20 bg-white rounded-xl border-[3px] border-[#3B2820] shadow-md flex flex-col items-center justify-center p-1 text-[#5BAE68]">
+                <span class="text-xs font-black self-start leading-none">3</span>
+                <span class="text-xl leading-none">♣️</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頂部標題與皇冠徽章區 -->
+    <header class="relative z-10 w-full max-w-3xl flex flex-col items-center mt-1 mb-3">
+        <!-- 頂部小標語 + 皇冠 -->
+        <div class="flex items-center gap-2 mb-1">
+            <!-- 可愛皇冠 SVG -->
+            <svg class="w-9 h-9 -rotate-12 drop-shadow-[0_3px_0_#3B2820]" viewBox="0 0 64 52" fill="none">
+                <path d="M8 40L4 14L20 26L32 8L44 26L60 14L56 40H8Z" fill="#F9C94A" stroke="#3B2820" stroke-width="4" stroke-linejoin="round"/>
+                <rect x="8" y="40" width="48" height="8" rx="3" fill="#F3A833" stroke="#3B2820" stroke-width="4"/>
+                <circle cx="4" cy="12" r="3.5" fill="#F9C94A" stroke="#3B2820" stroke-width="2.5"/>
+                <circle cx="32" cy="6" r="4" fill="#F9C94A" stroke="#3B2820" stroke-width="2.5"/>
+                <circle cx="60" cy="12" r="3.5" fill="#F9C94A" stroke="#3B2820" stroke-width="2.5"/>
+            </svg>
+            <div class="bg-[#FDF4DC] px-4 py-1 rounded-full board-border-sm text-xs sm:text-sm font-black tracking-wider flex items-center gap-2">
+                <span>運用數學，策略出擊！</span>
+                <button id="soundToggleBtn" onclick="toggleSound()" title="切換音效" class="ml-1 bg-[#F9D478] hover:bg-[#f6c54b] px-2 py-0.5 rounded-full border-2 border-[#3B2820] text-xs transition active:scale-95">
+                    🔊 音效開
+                </button>
+            </div>
+        </div>
+
+        <!-- 主標題：《數列攻防戰》五色手繪字體 -->
+        <h1 class="text-4xl sm:text-6xl font-black tracking-tight text-center leading-tight my-1 select-none">
+            <span class="game-title-char text-[#3B82F6] -rotate-3">數</span>
+            <span class="game-title-char text-[#2563EB] rotate-2">列</span>
+            <span class="game-title-char text-[#F59E0B] -rotate-2">攻</span>
+            <span class="game-title-char text-[#EF4444] rotate-2">防</span>
+            <span class="game-title-char text-[#22C55E] -rotate-2">戰</span>
+        </h1>
+
+        <!-- 副標題緞帶橫幅 -->
+        <div class="ribbon-banner px-6 sm:px-10 py-1.5 rounded-2xl -mt-1">
+            <p class="text-sm sm:text-lg font-black tracking-widest text-[#3B2820]">
+                ⚔️ 看準規律，出牌攻防計時！ 🛡️
+            </p>
+        </div>
+    </header>
+
+    <!-- 主桌遊盒容器 -->
+    <main id="gameBoxContainer" class="relative z-10 w-full max-w-3xl bg-[#FDF4DC]/95 backdrop-blur-sm rounded-[28px] board-border p-4 sm:p-6 transition-transform">
+        
+        <!-- 模式切換分頁按鈕 -->
+        <nav class="grid grid-cols-3 gap-2 sm:gap-3 mb-5" role="tablist">
+            <button id="tab-countdown" onclick="switchMode('countdown')" class="board-btn py-2.5 px-2 sm:px-4 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-1.5 bg-[#F5B841] text-[#3B2820]">
+                <span>⏳</span>
+                <span>回合倒數</span>
+            </button>
+            <button id="tab-knights" onclick="switchMode('knights')" class="board-btn py-2.5 px-2 sm:px-4 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-1.5 bg-white text-[#3B2820]">
+                <span>🛡️</span>
+                <span>騎士輪流戰</span>
+            </button>
+            <button id="tab-stopwatch" onclick="switchMode('stopwatch')" class="board-btn py-2.5 px-2 sm:px-4 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-1.5 bg-white text-[#3B2820]">
+                <span>⏱️</span>
+                <span>正計時碼表</span>
+            </button>
+        </nav>
+
+        <!-- 騎士陣營選擇區（在「騎士輪流戰」模式下可互動切換，其他模式作為可愛應援團顯示） -->
+        <section class="mb-5">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5 px-1">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm sm:text-base font-black">👑 參戰騎士陣營：</span>
+                    <div id="playerCountSelector" class="hidden flex items-center gap-1 bg-white px-2 py-1 rounded-xl border-2 border-[#3B2820]">
+                        <button onclick="setPlayerCount(2)" id="pCount-2" class="px-2 py-0.5 rounded-lg text-xs font-black bg-gray-100">2人</button>
+                        <button onclick="setPlayerCount(3)" id="pCount-3" class="px-2 py-0.5 rounded-lg text-xs font-black bg-gray-100">3人</button>
+                        <button onclick="setPlayerCount(4)" id="pCount-4" class="px-2 py-0.5 rounded-lg text-xs font-black bg-[#F5B841]">4人</button>
+                    </div>
+                </div>
+                <span id="knightHintText" class="text-xs sm:text-sm font-bold text-[#7A5848]">
+                    點擊騎士可切換發言 / 出牌選手！
+                </span>
+            </div>
+
+            <!-- 四位 Q 版騎士卡片 -->
+            <div id="knightsGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                <!-- 紅騎士 -->
+                <div id="knight-card-0" onclick="selectKnight(0)" class="knight-card cursor-pointer bg-[#FDECEC] rounded-2xl board-border-sm p-2.5 flex flex-col items-center relative transition-all">
+                    <span class="absolute top-1.5 left-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#E05A5A] text-white border border-[#3B2820]">1P</span>
+                    <span id="knight-badge-0" class="hidden absolute top-1.5 right-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#F5B841] text-[#3B2820] border border-[#3B2820]">出牌中</span>
+                    <!-- 紅騎士 SVG -->
+                    <svg class="w-16 h-16 sm:w-20 sm:h-20 mt-2" viewBox="0 0 100 100">
+                        <!-- 頭盔羽飾 -->
+                        <path d="M45 14C45 8 56 8 56 15C56 19 52 21 50 21C48 21 45 18 45 14Z" fill="#E05A5A" stroke="#3B2820" stroke-width="3.5"/>
+                        <!-- 身體鎧甲 -->
+                        <rect x="30" y="58" width="40" height="28" rx="12" fill="#E05A5A" stroke="#3B2820" stroke-width="3.5"/>
+                        <path d="M40 66H60" stroke="#3B2820" stroke-width="3" stroke-linecap="round"/>
+                        <!-- 頭盔主體 -->
+                        <rect x="25" y="20" width="50" height="42" rx="20" fill="#E05A5A" stroke="#3B2820" stroke-width="3.5"/>
+                        <!-- 耳罩 -->
+                        <rect x="20" y="34" width="8" height="16" rx="4" fill="#C94444" stroke="#3B2820" stroke-width="3"/>
+                        <rect x="72" y="34" width="8" height="16" rx="4" fill="#C94444" stroke="#3B2820" stroke-width="3"/>
+                        <!-- 臉部 -->
+                        <rect x="33" y="33" width="34" height="24" rx="10" fill="#FFE4D6" stroke="#3B2820" stroke-width="3"/>
+                        <!-- 眉毛與眼睛 -->
+                        <path d="M39 40L45 42" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M61 40L55 42" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round"/>
+                        <circle cx="42" cy="45" r="2.5" fill="#3B2820"/>
+                        <circle cx="58" cy="45" r="2.5" fill="#3B2820"/>
+                        <!-- 開心嘴巴 -->
+                        <path d="M46 50C46 53 54 53 54 50Z" fill="#E05A5A" stroke="#3B2820" stroke-width="2"/>
+                        <!-- 手持愛心卡牌 -->
+                        <rect x="12" y="46" width="18" height="24" rx="3" transform="rotate(-12 12 46)" fill="#FFFFFF" stroke="#3B2820" stroke-width="2.5"/>
+                        <text x="16" y="62" font-size="11" fill="#E05A5A" transform="rotate(-12 16 62)">♥</text>
+                    </svg>
+                    <div class="font-black text-sm sm:text-base text-[#B83737]">紅騎士</div>
+                    <div id="knight-time-0" class="text-xs sm:text-sm font-black tabular-nums bg-white/90 px-2.5 py-0.5 rounded-full border-2 border-[#3B2820] mt-1">00:00</div>
+                </div>
+
+                <!-- 藍騎士 -->
+                <div id="knight-card-1" onclick="selectKnight(1)" class="knight-card cursor-pointer bg-[#EBF3FE] rounded-2xl board-border-sm p-2.5 flex flex-col items-center relative transition-all">
+                    <span class="absolute top-1.5 left-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#4A90E2] text-white border border-[#3B2820]">2P</span>
+                    <span id="knight-badge-1" class="hidden absolute top-1.5 right-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#F5B841] text-[#3B2820] border border-[#3B2820]">出牌中</span>
+                    <!-- 藍騎士 SVG -->
+                    <svg class="w-16 h-16 sm:w-20 sm:h-20 mt-2" viewBox="0 0 100 100">
+                        <path d="M44 13C46 7 57 8 56 15C55 19 51 21 49 21C47 21 43 17 44 13Z" fill="#4A90E2" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="30" y="58" width="40" height="28" rx="12" fill="#4A90E2" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="25" y="20" width="50" height="42" rx="20" fill="#4A90E2" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="20" y="34" width="8" height="16" rx="4" fill="#357ABD" stroke="#3B2820" stroke-width="3"/>
+                        <rect x="72" y="34" width="8" height="16" rx="4" fill="#357ABD" stroke="#3B2820" stroke-width="3"/>
+                        <rect x="33" y="33" width="34" height="24" rx="10" fill="#FFE4D6" stroke="#3B2820" stroke-width="3"/>
+                        <!-- 眨眼表情 -->
+                        <circle cx="42" cy="45" r="2.5" fill="#3B2820"/>
+                        <path d="M55 45L60 43M55 45L60 47" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M46 50C46 54 54 54 54 50Z" fill="#E05A5A" stroke="#3B2820" stroke-width="2"/>
+                        <!-- 手持黑桃卡牌 -->
+                        <rect x="70" y="50" width="18" height="24" rx="3" transform="rotate(10 70 50)" fill="#FFFFFF" stroke="#3B2820" stroke-width="2.5"/>
+                        <text x="74" y="66" font-size="11" fill="#3B2820" transform="rotate(10 74 66)">♠</text>
+                    </svg>
+                    <div class="font-black text-sm sm:text-base text-[#2B6CB0]">藍騎士</div>
+                    <div id="knight-time-1" class="text-xs sm:text-sm font-black tabular-nums bg-white/90 px-2.5 py-0.5 rounded-full border-2 border-[#3B2820] mt-1">00:00</div>
+                </div>
+
+                <!-- 黃騎士 -->
+                <div id="knight-card-2" onclick="selectKnight(2)" class="knight-card cursor-pointer bg-[#FEF7E6] rounded-2xl board-border-sm p-2.5 flex flex-col items-center relative transition-all">
+                    <span class="absolute top-1.5 left-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#F5B841] text-[#3B2820] border border-[#3B2820]">3P</span>
+                    <span id="knight-badge-2" class="hidden absolute top-1.5 right-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#E05A5A] text-white border border-[#3B2820]">出牌中</span>
+                    <!-- 黃騎士 SVG -->
+                    <svg class="w-16 h-16 sm:w-20 sm:h-20 mt-2" viewBox="0 0 100 100">
+                        <path d="M45 14C45 8 56 8 56 15C56 19 52 21 50 21C48 21 45 18 45 14Z" fill="#F5B841" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="30" y="58" width="40" height="28" rx="12" fill="#F5B841" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="25" y="20" width="50" height="42" rx="20" fill="#F5B841" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="20" y="34" width="8" height="16" rx="4" fill="#D99B26" stroke="#3B2820" stroke-width="3"/>
+                        <rect x="72" y="34" width="8" height="16" rx="4" fill="#D99B26" stroke="#3B2820" stroke-width="3"/>
+                        <rect x="33" y="33" width="34" height="24" rx="10" fill="#FFE4D6" stroke="#3B2820" stroke-width="3"/>
+                        <path d="M39 40L44 42" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M61 40L56 42" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round"/>
+                        <circle cx="42" cy="45" r="2.5" fill="#3B2820"/>
+                        <circle cx="58" cy="45" r="2.5" fill="#3B2820"/>
+                        <path d="M46 50C46 53 54 53 54 50Z" fill="#E05A5A" stroke="#3B2820" stroke-width="2"/>
+                        <!-- 手持方塊卡牌 -->
+                        <rect x="12" y="50" width="18" height="24" rx="3" transform="rotate(-10 12 50)" fill="#FFFFFF" stroke="#3B2820" stroke-width="2.5"/>
+                        <text x="16" y="66" font-size="11" fill="#E05A5A" transform="rotate(-10 16 66)">♦</text>
+                    </svg>
+                    <div class="font-black text-sm sm:text-base text-[#B7791F]">黃騎士</div>
+                    <div id="knight-time-2" class="text-xs sm:text-sm font-black tabular-nums bg-white/90 px-2.5 py-0.5 rounded-full border-2 border-[#3B2820] mt-1">00:00</div>
+                </div>
+
+                <!-- 綠騎士 -->
+                <div id="knight-card-3" onclick="selectKnight(3)" class="knight-card cursor-pointer bg-[#ECF8EE] rounded-2xl board-border-sm p-2.5 flex flex-col items-center relative transition-all">
+                    <span class="absolute top-1.5 left-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#5BAE68] text-white border border-[#3B2820]">4P</span>
+                    <span id="knight-badge-3" class="hidden absolute top-1.5 right-2 text-[11px] font-black px-1.5 py-0.5 rounded-md bg-[#F5B841] text-[#3B2820] border border-[#3B2820]">出牌中</span>
+                    <!-- 綠騎士 SVG -->
+                    <svg class="w-16 h-16 sm:w-20 sm:h-20 mt-2" viewBox="0 0 100 100">
+                        <path d="M45 14C45 8 56 8 56 15C56 19 52 21 50 21C48 21 45 18 45 14Z" fill="#5BAE68" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="30" y="58" width="40" height="28" rx="12" fill="#5BAE68" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="25" y="20" width="50" height="42" rx="20" fill="#5BAE68" stroke="#3B2820" stroke-width="3.5"/>
+                        <rect x="20" y="34" width="8" height="16" rx="4" fill="#438E4F" stroke="#3B2820" stroke-width="3"/>
+                        <rect x="72" y="34" width="8" height="16" rx="4" fill="#438E4F" stroke="#3B2820" stroke-width="3"/>
+                        <rect x="33" y="33" width="34" height="24" rx="10" fill="#FFE4D6" stroke="#3B2820" stroke-width="3"/>
+                        <path d="M39 41L45 41" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M61 41L55 41" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round"/>
+                        <circle cx="42" cy="45" r="2.5" fill="#3B2820"/>
+                        <circle cx="58" cy="45" r="2.5" fill="#3B2820"/>
+                        <path d="M47 51Q50 49 53 51" stroke="#3B2820" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                        <!-- 手持梅花卡牌 -->
+                        <rect x="70" y="48" width="18" height="24" rx="3" transform="rotate(12 70 48)" fill="#FFFFFF" stroke="#3B2820" stroke-width="2.5"/>
+                        <text x="74" y="64" font-size="11" fill="#3B2820" transform="rotate(12 74 64)">♣</text>
+                    </svg>
+                    <div class="font-black text-sm sm:text-base text-[#2F855A]">綠騎士</div>
+                    <div id="knight-time-3" class="text-xs sm:text-sm font-black tabular-nums bg-white/90 px-2.5 py-0.5 rounded-full border-2 border-[#3B2820] mt-1">00:00</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 中央大型計時器顯示牌 -->
+        <section class="bg-white rounded-3xl board-border p-4 sm:p-6 mb-5 relative overflow-hidden">
+            <!-- 狀態小標籤 -->
+            <div class="flex items-center justify-between mb-2">
+                <span id="timerStatusBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-black bg-[#EBF3FE] text-[#2B6CB0] border-2 border-[#3B2820]">
+                    <span>🎲</span>
+                    <span id="timerStatusText">準備出牌中</span>
+                </span>
+                <span id="turnCounterBadge" class="text-xs sm:text-sm font-black px-3 py-1 rounded-full bg-[#FEF7E6] border-2 border-[#3B2820]">
+                    第 <span id="roundNumber">1</span> 回合
+                </span>
+            </div>
+
+            <!-- 超大計時數字 -->
+            <div class="text-center my-2 sm:my-3">
+                <div id="mainTimeDisplay" class="text-6xl sm:text-7xl md:text-8xl font-black tabular-nums tracking-wider text-[#3B2820] drop-shadow-[0_3px_0_rgba(59,40,32,0.15)]">
+                    01:00
+                </div>
+                <div id="subTimeDisplay" class="text-xs sm:text-sm font-bold text-[#7A5848] mt-1">
+                    預設回合倒數計時 • 把握時間思考數列！
+                </div>
+            </div>
+
+            <!-- 進度條（倒數模式專用） -->
+            <div id="progressBarWrapper" class="w-full h-4 bg-[#EADBC8] rounded-full border-2 border-[#3B2820] overflow-hidden mt-3">
+                <div id="progressBarFill" class="h-full bg-gradient-to-r from-[#5BAE68] via-[#F5B841] to-[#E05A5A] transition-all duration-200" style="width: 100%;"></div>
+            </div>
+
+            <!-- 時間到提示橫幅（平時隱藏） -->
+            <div id="timeUpBanner" class="hidden mt-4 bg-[#E05A5A] text-white rounded-2xl border-[3px] border-[#3B2820] p-3 text-center">
+                <p class="text-lg sm:text-xl font-black tracking-wide">⏰ 時間到！請立即出牌或換下一位騎士！</p>
+            </div>
+        </section>
+
+        <!-- 快速時間預設與自訂區（倒數與騎士模式顯示） -->
+        <section id="presetSection" class="mb-5">
+            <div class="flex flex-wrap items-center justify-center gap-2 mb-3">
+                <button onclick="setPresetTime(30)" class="board-btn bg-white hover:bg-[#FEF7E6] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black">30 秒</button>
+                <button onclick="setPresetTime(60)" class="board-btn bg-white hover:bg-[#FEF7E6] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black">1 分鐘</button>
+                <button onclick="setPresetTime(180)" class="board-btn bg-white hover:bg-[#FEF7E6] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black">3 分鐘</button>
+                <button onclick="setPresetTime(900)" class="board-btn bg-[#EBF3FE] hover:bg-[#dbeafe] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black text-[#2B6CB0]">15 分鐘 (標準局)</button>
+                <button onclick="setPresetTime(1500)" class="board-btn bg-[#ECF8EE] hover:bg-[#dcfce7] px-3 py-1.5 rounded-xl text-xs sm:text-sm font-black text-[#2F855A]">25 分鐘 (完整局)</button>
+            </div>
+
+            <!-- 自訂分/秒輸入 -->
+            <div class="flex items-center justify-center gap-2 bg-white/80 py-2 px-3 rounded-2xl border-2 border-[#3B2820] max-w-md mx-auto">
+                <span class="text-xs sm:text-sm font-black">自訂時間：</span>
+                <input id="customMinInput" type="number" min="0" max="99" value="1" aria-label="自訂分鐘" class="w-14 text-center font-black bg-[#FDF4DC] border-2 border-[#3B2820] rounded-lg py-1 text-sm">
+                <span class="text-xs sm:text-sm font-black">分</span>
+                <input id="customSecInput" type="number" min="0" max="59" value="0" aria-label="自訂秒數" class="w-14 text-center font-black bg-[#FDF4DC] border-2 border-[#3B2820] rounded-lg py-1 text-sm">
+                <span class="text-xs sm:text-sm font-black">秒</span>
+                <button onclick="applyCustomTime()" class="board-btn bg-[#F5B841] px-3 py-1 rounded-lg text-xs sm:text-sm font-black ml-1">設定</button>
+            </div>
+        </section>
+
+        <!-- 主要控制按鈕群 -->
+        <section class="flex flex-wrap items-center justify-center gap-3">
+            <button id="startPauseBtn" onclick="toggleTimer()" class="board-btn bg-[#5BAE68] text-white px-6 sm:px-8 py-3 rounded-2xl text-base sm:text-lg font-black flex items-center gap-2 min-w-[140px] justify-center">
+                <span id="startPauseIcon">⚔️</span>
+                <span id="startPauseText">開始出擊</span>
+            </button>
+
+            <button id="nextTurnBtn" onclick="handleNextAction()" class="board-btn bg-[#4A90E2] text-white px-5 sm:px-6 py-3 rounded-2xl text-base sm:text-lg font-black flex items-center gap-2">
+                <span id="nextTurnIcon">🃏</span>
+                <span id="nextTurnText">換下一位 (空白鍵)</span>
+            </button>
+
+            <button onclick="resetTimer()" class="board-btn bg-[#E05A5A] text-white px-5 py-3 rounded-2xl text-base sm:text-lg font-black flex items-center gap-2">
+                <span>🔄</span>
+                <span>重置</span>
+            </button>
+        </section>
+
+        <!-- 碼表分段紀錄區（僅在正計時碼表模式顯示） -->
+        <section id="lapSection" class="hidden mt-5 bg-white rounded-2xl border-2 border-[#3B2820] p-3">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-black">📜 出牌速度紀錄榜</h3>
+                <button onclick="clearLaps()" class="text-xs font-black text-[#E05A5A] hover:underline">清除紀錄</button>
+            </div>
+            <ul id="lapList" class="max-h-36 overflow-y-auto space-y-1.5 text-xs sm:text-sm font-bold">
+                <li class="text-center text-gray-400 py-2">尚未紀錄任何回合，點擊「紀錄回合」留下戰績！</li>
+            </ul>
+        </section>
+    </main>
+
+    <!-- 底部桌遊規格資訊條（還原包裝盒底部設計：2-4人 | 15-25分鐘 | 數學策略） -->
+    <footer class="relative z-10 w-full max-w-3xl mt-4">
+        <div class="bg-[#FDF4DC] rounded-full board-border-sm px-4 py-2 flex flex-wrap items-center justify-around gap-2 text-xs sm:text-sm font-black text-[#3B2820]">
+            <div class="flex items-center gap-1.5">
+                <span>👥</span>
+                <span>2-4人對戰</span>
+            </div>
+            <span class="hidden sm:inline text-[#C4A484]">|</span>
+            <div class="flex items-center gap-1.5">
+                <span>⏱️</span>
+                <span>15-25分鐘</span>
+            </div>
+            <span class="hidden sm:inline text-[#C4A484]">|</span>
+            <div class="flex items-center gap-1.5">
+                <span>🎓</span>
+                <span>數列攻防 • 快捷鍵 [空白鍵] 換人</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 音效與計時邏輯腳本 -->
+    <script>
+        // ==========================================
+        // 1. Web Audio API 桌遊木質與音效合成器
+        // ==========================================
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleSound() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('soundToggleBtn');
+            btn.textContent = isMuted ? '🔇 靜音中' : '🔊 音效開';
+            if (!isMuted) {
+                initAudio();
+                playClickSound();
+            }
+        }
+
+        // 桌遊木質按鈕點擊聲
+        function playClickSound() {
+            if (isMuted) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(520, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(180, audioCtx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.08);
+        }
+
+        // 換下一位騎士的翻牌/號角短音
+        function playSwitchSound() {
+            if (isMuted) return;
+            initAudio();
+            const notes = [523.25, 659.25]; // C5 -> E5
+            notes.forEach((freq, idx) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.08);
+                gain.gain.setValueAtTime(0.22, audioCtx.currentTime + idx * 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.08 + 0.15);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + idx * 0.08);
+                osc.stop(audioCtx.currentTime + idx * 0.08 + 0.15);
+            });
+        }
+
+        // 最後 5 秒倒數滴答警告聲
+        function playTickSound() {
+            if (isMuted) return;
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.07);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.07);
+        }
+
+        // 時間到勝利/警示號角
+        function playAlarmFanfare() {
+            if (isMuted) return;
+            initAudio();
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6
+            notes.forEach((freq, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.12);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime + i * 0.12);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.12 + 0.35);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + i * 0.12);
+                osc.stop(audioCtx.currentTime + i * 0.12 + 0.35);
+            });
+        }
+
+        // ==========================================
+        // 2. 計時器狀態管理
+        // ==========================================
+        let currentMode = 'countdown'; // 'countdown' | 'knights' | 'stopwatch'
+        let isRunning = false;
+        let timerInterval = null;
+
+        // 倒數計時變數（單位：秒）
+        let initialSeconds = 60;
+        let remainingSeconds = 60;
+
+        // 碼表變數（單位：毫秒）
+        let stopwatchMs = 0;
+        let laps = [];
+
+        // 騎士輪流戰狀態
+        let playerCount = 4;
+        let activeKnightIndex = 0;
+        let roundNumber = 1;
+        const knightsData = [
+            { name: '紅騎士', color: '#E05A5A', elapsedSeconds: 0 },
+            { name: '藍騎士', color: '#4A90E2', elapsedSeconds: 0 },
+            { name: '黃騎士', color: '#F5B841', elapsedSeconds: 0 },
+            { name: '綠騎士', color: '#5BAE68', elapsedSeconds: 0 }
+        ];
+
+        // 格式化秒數為 MM:SS
+        function formatSeconds(totalSec) {
+            const safeSec = Math.max(0, Math.floor(totalSec));
+            const mins = Math.floor(safeSec / 60);
+            const secs = safeSec % 60;
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        // 格式化毫秒為 MM:SS.d
+        function formatStopwatch(ms) {
+            const totalSec = Math.floor(ms / 1000);
+            const mins = Math.floor(totalSec / 60);
+            const secs = totalSec % 60;
+            const tenths = Math.floor((ms % 1000) / 100);
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${tenths}`;
+        }
+
+        // ==========================================
+        // 3. 模式與界面更新
+        // ==========================================
+        function switchMode(mode) {
+            playClickSound();
+            pauseTimer();
+            clearTimeUpAlert();
+            currentMode = mode;
+
+            // 更新分頁按鈕外觀
+            ['countdown', 'knights', 'stopwatch'].forEach(m => {
+                const btn = document.getElementById(`tab-${m}`);
+                if (m === mode) {
+                    btn.classList.remove('bg-white');
+                    btn.classList.add('bg-[#F5B841]');
+                } else {
+                    btn.classList.remove('bg-[#F5B841]');
+                    btn.classList.add('bg-white');
+                }
+            });
+
+            const playerCountSelector = document.getElementById('playerCountSelector');
+            const presetSection = document.getElementById('presetSection');
+            const progressBarWrapper = document.getElementById('progressBarWrapper');
+            const lapSection = document.getElementById('lapSection');
+            const nextTurnBtn = document.getElementById('nextTurnBtn');
+            const nextTurnIcon = document.getElementById('nextTurnIcon');
+            const nextTurnText = document.getElementById('nextTurnText');
+            const subTimeDisplay = document.getElementById('subTimeDisplay');
+
+            if (mode === 'countdown') {
+                playerCountSelector.classList.add('hidden');
+                presetSection.classList.remove('hidden');
+                progressBarWrapper.classList.remove('hidden');
+                lapSection.classList.add('hidden');
+                nextTurnBtn.classList.remove('hidden');
+                nextTurnIcon.textContent = '🃏';
+                nextTurnText.textContent = '重置並下一回合';
+                subTimeDisplay.textContent = '單局 / 回合倒數模式 • 把握時間思考數列！';
+                remainingSeconds = initialSeconds;
+            } else if (mode === 'knights') {
+                playerCountSelector.classList.remove('hidden');
+                presetSection.classList.remove('hidden');
+                progressBarWrapper.classList.remove('hidden');
+                lapSection.classList.add('hidden');
+                nextTurnBtn.classList.remove('hidden');
+                nextTurnIcon.textContent = '⚔️';
+                nextTurnText.textContent = '出牌結束 / 換下一位';
+                subTimeDisplay.textContent = '輪流倒數模式 • 每次換人自動重新倒數並累計思考時間！';
+                remainingSeconds = initialSeconds;
+            } else if (mode === 'stopwatch') {
+                playerCountSelector.classList.add('hidden');
+                presetSection.classList.add('hidden');
+                progressBarWrapper.classList.add('hidden');
+                lapSection.classList.remove('hidden');
+                nextTurnBtn.classList.remove('hidden');
+                nextTurnIcon.textContent = '🚩';
+                nextTurnText.textContent = '紀錄回合時間';
+                subTimeDisplay.textContent = '自由正計時模式 • 計算整場《數列攻防戰》耗時！';
+            }
+
+            updateKnightsUI();
+            updateDisplay();
+        }
+
+        function setPlayerCount(count) {
+            playClickSound();
+            playerCount = count;
+            [2, 3, 4].forEach(c => {
+                const btn = document.getElementById(`pCount-${c}`);
+                btn.className = c === count 
+                    ? 'px-2 py-0.5 rounded-lg text-xs font-black bg-[#F5B841] border border-[#3B2820]' 
+                    : 'px-2 py-0.5 rounded-lg text-xs font-black bg-gray-100';
+            });
+            if (activeKnightIndex >= playerCount) {
+                activeKnightIndex = 0;
+            }
+            updateKnightsUI();
+        }
+
+        function selectKnight(index) {
+            if (index >= playerCount && currentMode === 'knights') return;
+            playSwitchSound();
+            clearTimeUpAlert();
+            activeKnightIndex = index;
+
+            // 在騎士輪流戰模式下，切換騎士自動重置單回合倒數
+            if (currentMode === 'knights') {
+                remainingSeconds = initialSeconds;
+            }
+            updateKnightsUI();
+            updateDisplay();
+        }
+
+        function updateKnightsUI() {
+            for (let i = 0; i < 4; i++) {
+                const card = document.getElementById(`knight-card-${i}`);
+                const badge = document.getElementById(`knight-badge-${i}`);
+                const timeEl = document.getElementById(`knight-time-${i}`);
+
+                // 隱藏超過玩家人數的卡片（僅在騎士輪流戰模式）
+                if (currentMode === 'knights' && i >= playerCount) {
+                    card.classList.add('opacity-35', 'pointer-events-none');
+                } else {
+                    card.classList.remove('opacity-35', 'pointer-events-none');
+                }
+
+                // 高亮目前出牌騎士
+                if (i === activeKnightIndex) {
+                    card.classList.add('knight-active', 'scale-[1.03]');
+                    badge.classList.remove('hidden');
+                } else {
+                    card.classList.remove('knight-active', 'scale-[1.03]');
+                    badge.classList.add('hidden');
+                }
+
+                timeEl.textContent = `累計 ${formatSeconds(knightsData[i].elapsedSeconds)}`;
+            }
+        }
+
+        // ==========================================
+        // 4. 計時核心邏輯
+        // ==========================================
+        function setPresetTime(seconds) {
+            playClickSound();
+            pauseTimer();
+            clearTimeUpAlert();
+            initialSeconds = seconds;
+            remainingSeconds = seconds;
+            document.getElementById('customMinInput').value = Math.floor(seconds / 60);
+            document.getElementById('customSecInput').value = seconds % 60;
+            updateDisplay();
+        }
+
+        function applyCustomTime() {
+            const mins = Math.max(0, Math.min(99, parseInt(document.getElementById('customMinInput').value, 10) || 0));
+            const secs = Math.max(0, Math.min(59, parseInt(document.getElementById('customSecInput').value, 10) || 0));
+            const total = mins * 60 + secs;
+            if (total <= 0) {
+                setPresetTime(30);
+                return;
+            }
+            setPresetTime(total);
+        }
+
+        function toggleTimer() {
+            playClickSound();
+            if (isRunning) {
+                pauseTimer();
+            } else {
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            if (isRunning) return;
+            initAudio();
+            clearTimeUpAlert();
+
+            if ((currentMode === 'countdown' || currentMode === 'knights') && remainingSeconds <= 0) {
+                remainingSeconds = initialSeconds;
+            }
+
+            isRunning = true;
+            updateControlButtons();
+
+            let lastTickTime = Date.now();
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                const deltaMs = now - lastTickTime;
+                lastTickTime = now;
+
+                if (currentMode === 'stopwatch') {
+                    stopwatchMs += deltaMs;
+                    // 同時累計當前騎士思考時間
+                    knightsData[activeKnightIndex].elapsedSeconds += deltaMs / 1000;
+                    updateDisplay();
+                    updateKnightsUI();
+                } else {
+                    // 倒數模式與騎士輪流戰
+                    const prevSec = Math.ceil(remainingSeconds);
+                    remainingSeconds -= deltaMs / 1000;
+                    knightsData[activeKnightIndex].elapsedSeconds += deltaMs / 1000;
+                    const currSec = Math.ceil(remainingSeconds);
+
+                    // 最後 5 秒提示音
+                    if (currSec !== prevSec && currSec <= 5 && currSec > 0) {
+                        playTickSound();
+                    }
+
+                    if (remainingSeconds <= 0) {
+                        remainingSeconds = 0;
+                        updateDisplay();
+                        updateKnightsUI();
+                        triggerTimeUp();
+                    } else {
+                        updateDisplay();
+                        updateKnightsUI();
+                    }
+                }
+            }, 100);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            updateControlButtons();
+            updateDisplay();
+        }
+
+        function resetTimer() {
+            playClickSound();
+            pauseTimer();
+            clearTimeUpAlert();
+            roundNumber = 1;
+            document.getElementById('roundNumber').textContent = roundNumber;
+
+            if (currentMode === 'stopwatch') {
+                stopwatchMs = 0;
+            } else {
+                remainingSeconds = initialSeconds;
+            }
+
+            // 重置所有騎士累計時間
+            knightsData.forEach(k => k.elapsedSeconds = 0);
+            updateKnightsUI();
+            updateDisplay();
+        }
+
+        function handleNextAction() {
+            if (currentMode === 'stopwatch') {
+                // 紀錄碼表分段
+                playSwitchSound();
+                const knightName = knightsData[activeKnightIndex].name;
+                laps.unshift({
+                    round: laps.length + 1,
+                    knight: knightName,
+                    time: formatStopwatch(stopwatchMs)
+                });
+                renderLaps();
+            } else if (currentMode === 'knights') {
+                // 換下一位騎士
+                playSwitchSound();
+                clearTimeUpAlert();
+                activeKnightIndex = (activeKnightIndex + 1) % playerCount;
+                if (activeKnightIndex === 0) {
+                    roundNumber++;
+                    document.getElementById('roundNumber').textContent = roundNumber;
+                }
+                remainingSeconds = initialSeconds;
+                updateKnightsUI();
+                updateDisplay();
+                if (!isRunning) {
+                    startTimer();
+                }
+            } else {
+                // 單人倒數模式：重置並進入下一回合
+                playSwitchSound();
+                clearTimeUpAlert();
+                roundNumber++;
+                document.getElementById('roundNumber').textContent = roundNumber;
+                remainingSeconds = initialSeconds;
+                updateDisplay();
+                if (!isRunning) {
+                    startTimer();
+                }
+            }
+        }
+
+        function triggerTimeUp() {
+            pauseTimer();
+            playAlarmFanfare();
+            document.getElementById('timeUpBanner').classList.remove('hidden');
+            document.getElementById('gameBoxContainer').classList.add('alarm-shake');
+            document.getElementById('timerStatusText').textContent = '回合時間結束！';
+            document.getElementById('timerStatusBadge').className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-black bg-[#E05A5A] text-white border-2 border-[#3B2820]';
+        }
+
+        function clearTimeUpAlert() {
+            document.getElementById('timeUpBanner').classList.add('hidden');
+            document.getElementById('gameBoxContainer').classList.remove('alarm-shake');
+        }
+
+        function updateControlButtons() {
+            const btn = document.getElementById('startPauseBtn');
+            const icon = document.getElementById('startPauseIcon');
+            const text = document.getElementById('startPauseText');
+
+            if (isRunning) {
+                btn.classList.remove('bg-[#5BAE68]');
+                btn.classList.add('bg-[#F5B841]', 'text-[#3B2820]');
+                btn.classList.remove('text-white');
+                icon.textContent = '⏸️';
+                text.textContent = '暫停計時';
+            } else {
+                btn.classList.remove('bg-[#F5B841]', 'text-[#3B2820]');
+                btn.classList.add('bg-[#5BAE68]', 'text-white');
+                icon.textContent = '⚔️';
+                text.textContent = '開始出擊';
+            }
+        }
+
+        function updateDisplay() {
+            const mainDisplay = document.getElementById('mainTimeDisplay');
+            const statusText = document.getElementById('timerStatusText');
+            const statusBadge = document.getElementById('timerStatusBadge');
+            const progressFill = document.getElementById('progressBarFill');
+
+            if (currentMode === 'stopwatch') {
+                mainDisplay.textContent = formatStopwatch(stopwatchMs);
+                mainDisplay.classList.remove('text-[#E05A5A]');
+                statusText.textContent = isRunning ? `${knightsData[activeKnightIndex].name} 激戰計時中...` : '碼表已就緒';
+            } else {
+                const displaySec = Math.ceil(remainingSeconds);
+                mainDisplay.textContent = formatSeconds(displaySec);
+
+                // 最後 10 秒數字變紅警告
+                if (displaySec <= 10 && displaySec > 0) {
+                    mainDisplay.classList.add('text-[#E05A5A]');
+                } else {
+                    mainDisplay.classList.remove('text-[#E05A5A]');
+                }
+
+                // 進度條百分比
+                const pct = initialSeconds > 0 ? Math.max(0, Math.min(100, (remainingSeconds / initialSeconds) * 100)) : 0;
+                progressFill.style.width = `${pct}%`;
+
+                if (remainingSeconds > 0) {
+                    statusText.textContent = isRunning 
+                        ? `${knightsData[activeKnightIndex].name} 思考出牌中...` 
+                        : `輪到 ${knightsData[activeKnightIndex].name} 準備`;
+                    statusBadge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs sm:text-sm font-black bg-[#EBF3FE] text-[#2B6CB0] border-2 border-[#3B2820]';
+                }
+            }
+        }
+
+        function renderLaps() {
+            const list = document.getElementById('lapList');
+            if (laps.length === 0) {
+                list.innerHTML = '<li class="text-center text-gray-400 py-2">尚未紀錄任何回合，點擊「紀錄回合時間」留下戰績！</li>';
+                return;
+            }
+            list.innerHTML = laps.map(item => `
+                <li class="flex items-center justify-between bg-[#FDF4DC] px-3 py-1.5 rounded-xl border border-[#3B2820]">
+                    <span>第 ${item.round} 筆 • <strong>${item.knight}</strong></span>
+                    <span class="tabular-nums font-black text-[#2B6CB0]">${item.time}</span>
+                </li>
+            `).join('');
+        }
+
+        function clearLaps() {
+            playClickSound();
+            laps = [];
+            renderLaps();
+        }
+
+        // ==========================================
+        // 5. 鍵盤快捷鍵支援（空白鍵換下一位 / Enter 開始暫停）
+        // ==========================================
+        document.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT') return;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                handleNextAction();
+            } else if (e.code === 'Enter') {
+                e.preventDefault();
+                toggleTimer();
+            }
+        });
+
+        // 初始化畫面
+        updateKnightsUI();
+        updateDisplay();
+    </script>
+</body>
+</html>
